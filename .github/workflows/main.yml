@@ -19,20 +19,20 @@ jobs:
 
   ## Build Jobs ##
   ### Build Linux Jobs ###
-  build-rocky87:
+  build-centos7:
     secrets: inherit
     uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/docker.yml@main
     with:
-      image: rockylinux:8.7
+      image: centos:7
       cmd: |
         gitlab/build.sh
 
-  build-rocky87-icx:
+  build-centos7-icx:
     secrets: inherit
     uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/docker.yml@main
     with:
       submodules: true
-      image: rockylinux:8.7
+      image: centos:7
       #artifact-out: build-centos7-icx
       #artifact-path: ./build/install ./build/openvkl/build
       cmd: |
@@ -45,13 +45,13 @@ jobs:
         gitlab/build.sh
 
 
-  build-rocky87-icc:
+  build-centos7-icc:
     secrets: inherit
     uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/docker.yml@main
     with:
       force-delete: true    # guarantees .gitattributes are respected in working dir
       submodules: true
-      image: rockylinux:8.7
+      image: centos:7
       #artifact-out: build-centos7-icc
       #artifact-path: ./build/install ./build/openvkl/build
       cmd: |
@@ -80,6 +80,13 @@ jobs:
   #    cmd: |
   #      gitlab/build.sh
 
+  build-ubuntu18-04:
+    secrets: inherit
+    uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/docker.yml@main
+    with:
+      image: ubuntu:18.04
+      cmd: |
+        gitlab/build.sh
 
   build-ubuntu20-04:
     secrets: inherit
@@ -136,32 +143,25 @@ jobs:
       cmd: |
           gitlab/build_mac.sh
 
-  #build-macOS-icc:
-  #  secrets: inherit
-  #  uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/macos.yml@main
-  #  with:
-  #    runs-on: '[ "macOS", "build", "avx2", "x86_64" ]'
-  #    cmd: |
-  #        export CC=icc
-  #        export CXX=icpc
-  #        export CXXFLAGS="-static-intel -fPIC"
-  #        gitlab/build_mac.sh
-
-  build-macOS-arm-old:
+  build-macOS-icc:
     secrets: inherit
     uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/macos.yml@main
     with:
-      runs-on: '[ "macOS", "arm", "vis-mac-mini-m1-2" ]'
+      runs-on: '[ "macOS", "build", "avx2", "x86_64" ]'
       cmd: |
-          gitlab/build_mac.sh -DBUILD_TBB_FROM_SOURCE=ON
+          export CC=icc
+          export CXX=icpc
+          export CXXFLAGS="-static-intel -fPIC"
+          gitlab/build_mac.sh
 
-  build-macOS-arm-new:
+  build-macOS-arm:
     secrets: inherit
     uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/macos.yml@main
     with:
-      runs-on: '[ "macOS", "build", "arm", "vis-mac-mini-m1-1" ]'
+      runs-on: '[ "macOS", "build", "arm" ]'
       cmd: |
           gitlab/build_mac.sh -DBUILD_TBB_FROM_SOURCE=ON
+
 
   ### KW Jobs ###
 
@@ -171,13 +171,12 @@ jobs:
     with:
       project: OpenPGL
       #submodules: true
-      coverity: true
-      prebuild: > 
-        export LD_LIBRARY_PATH=`pwd`/build_deps/install/lib:${LD_LIBRARY_PATH} &&
-        cmake -S superbuild -B build_deps -DBUILD_JOBS=`nproc` -DBUILD_DEPENDENCIES_ONLY=ON &&
-        cmake --build build_deps &&
-        DEP_INSTALL_DIR=build_deps/install &&
-        export embree_DIR=$DEP_INSTALL_DIR &&
+      prebuild: |
+        export LD_LIBRARY_PATH=`pwd`/build_deps/install/lib:${LD_LIBRARY_PATH}
+        cmake -S superbuild -B build_deps -DBUILD_JOBS=`nproc` -DBUILD_DEPENDENCIES_ONLY=ON
+        cmake --build build_deps
+        DEP_INSTALL_DIR=build_deps/install
+        export embree_DIR=$DEP_INSTALL_DIR
         cmake -S . -B build -DTBB_ROOT=$DEP_INSTALL_DIR
       build: cmake --build build
 
@@ -189,9 +188,9 @@ jobs:
     secrets: inherit
     uses: intel-innersource/libraries.devops.renderkit.workflows/.github/workflows/docker.yml@main
     with:
-      image: rockylinux:8.7
+      image: centos:7
       cmd: |
-        export OPENPGL_RELEASE_PACKAGE_VERSION=0.6.0
+        export OPENPGL_RELEASE_PACKAGE_VERSION=0.5.0
         gitlab/release/linux.sh
       artifact-out: release-linux
       artifact-path: ./openpgl*.gz
@@ -205,8 +204,8 @@ jobs:
       artifact-out: release-windows
       artifact-path: ./openpgl*.zip
       cmd: |
-        $env:OPENPGL_RELEASE_PACKAGE_VERSION="0.6.0"
-        $OPENPGL_RELEASE_PACKAGE_VERSION="0.6.0"
+        $env:OPENPGL_RELEASE_PACKAGE_VERSION="0.5.0"
+        $OPENPGL_RELEASE_PACKAGE_VERSION="0.5.0"
         gitlab/release/windows.ps1 "Visual Studio 15 2017 Win64" "v141"
 
   release-macos:
@@ -218,7 +217,7 @@ jobs:
       artifact-out: release-macos
       artifact-path: ./*.zip
       cmd: |
-        export OPENPGL_RELEASE_PACKAGE_VERSION="0.6.0"
+        export OPENPGL_RELEASE_PACKAGE_VERSION="0.5.0"
         gitlab/release/macos.sh
 
   #release-macos-arm:
@@ -230,7 +229,7 @@ jobs:
   #    artifact-out: release-macos-arm
   #    artifact-path: ./*.zip
   #    cmd: |
-  #      export OPENPGL_RELEASE_PACKAGE_VERSION="0.6.0"
+  #      export OPENPGL_RELEASE_PACKAGE_VERSION="0.5.0"
   #      gitlab/release/macos.sh -DBUILD_TBB_FROM_SOURCE=ON
 
   ## Binary Scan Jobs ##
