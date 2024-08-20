@@ -7,12 +7,14 @@
 #include <string>
 
 #include "../openpgl.h"
-
 #include "Common.h"
 #include "Distribution.h"
-#include "FieldStatistics.h"
-#include "FieldConfig.h"
 #include "Field.h"
+#include "FieldConfig.h"
+#include "FieldStatistics.h"
+#if defined(OPENPGL_IMAGE_SPACE_GUIDING_BUFFER)
+#include "ImageSpaceGuidingBuffer.h"
+#endif
 #include "PathSegmentStorage.h"
 #include "Region.h"
 #include "RussianRoulette.h"
@@ -20,4 +22,3 @@
 #include "SampleStorage.h"
 #include "SurfaceSamplingDistribution.h"
 #include "VolumeSamplingDistribution.h"
-

@@ -11,6 +11,7 @@ if(OPENPGL_ISA_AVX2 OR OPENPGL_ISA_NEON2X)
 endif()
 if(OPENPGL_ISA_AVX512)
   set(DEVICE_SRC ${DEVICE_SRC} api/deviceCPU16.cpp)
+  set(OPENPGL_SUPPORT_DEVICE_TYPE_CPU_16 ON)
 endif()
 
 set(OPENPGL_SRC
@@ -20,6 +21,13 @@ set(OPENPGL_SRC
     directional/IVolumeSamplingDistribution.cpp
     directional/vmm/VMMPhaseFunctions.cpp
     ../third-party/embreeSrc/common/simd/sse.cpp
+    ../third-party/embreeSrc/common/sys/alloc.cpp
+    ../third-party/embreeSrc/common/sys/barrier.cpp
+    ../third-party/embreeSrc/common/sys/condition.cpp
+    ../third-party/embreeSrc/common/sys/mutex.cpp
+    ../third-party/embreeSrc/common/sys/estring.cpp
+    ../third-party/embreeSrc/common/sys/sysinfo.cpp
+    ../third-party/embreeSrc/common/sys/thread.cpp
 )
 
 if(OPENPGL_BUILD_STATIC)
@@ -34,11 +42,27 @@ add_library(${PROJECT_NAME} SHARED
 target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_SHARED)
 endif()
 
+if(OPENPGL_EF_RADIANCE_CACHES)
+target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_RADIANCE_CACHES)
+endif()
+
+if(OPENPGL_EF_IMAGE_SPACE_GUIDING_BUFFER)
+target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_IMAGE_SPACE_GUIDING_BUFFER)
+endif()
+
+if(OPENPGL_DIRECTION_COMPRESSION)
+target_compile_definitions(${PROJECT_NAME} PRIVATE PGL_USE_DIRECTION_COMPRESSION)
+endif()
+
+if(OPENPGL_RADIANCE_COMPRESSION)
+target_compile_definitions(${PROJECT_NAME} PRIVATE PGL_USE_COLOR_COMPRESSION)
+endif()
 
 #target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_DEBUG_MODE)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} OPENPGL_VERSION_MINOR=${PROJECT_VERSION_MINOR} OPENPGL_VERSION_PATCH=${PROJECT_VERSION_PATCH})
 target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_VERSION_STRING="${PROJECT_VERSION}")
+target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_BUILD)
 if(OPENPGL_ISA_SSE4 OR OPENPGL_ISA_NEON)
   target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_DEVICE_TYPE_CPU_4)
 endif()
@@ -48,6 +72,10 @@ endif()
 if(OPENPGL_ISA_AVX512)
   target_compile_definitions(${PROJECT_NAME} PRIVATE OPENPGL_DEVICE_TYPE_CPU_16)
 endif()
+
+message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Arch: ${CMAKE_SYSTEM_PROCESSOR}")
 
 if(WIN32)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -128,11 +156,6 @@ else()
   endif()
 endif()
 
-
-#if(OPENPGL_USE_OMP_THREADING)
-#  set(OPENPGL_RELEASE_OPTIONS -fopenmp)
-#endif()
-
 target_compile_options(${PROJECT_NAME} PRIVATE ${OPENPGL_COMMON_OPTIONS})
 target_compile_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:${OPENPGL_RELEASE_OPTIONS}>")
 target_compile_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:RelWithDebInfo>:${OPENPGL_RELEASE_OPTIONS}>")
@@ -141,15 +164,9 @@ target_compile_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:MinSizeRel>:${OPENPGL
 # CMAKE 3.8 feature
 #target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 
-#if(OPENPGL_USE_OMP_THREADING)
-#  add_compile_definitions(OPENPGL_USE_OMP_THREADING)
-#endif()
-
-#add_compile_options()
-
-message(STATUS "CMAKE_CURRENT_LIST_DIR = ${CMAKE_CURRENT_LIST_DIR}")
-message(STATUS "CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR}")
-message(STATUS "CMAKE_CURRENT_BINARY_DIR = ${CMAKE_CURRENT_BINARY_DIR}")
+#message(STATUS "CMAKE_CURRENT_LIST_DIR = ${CMAKE_CURRENT_LIST_DIR}")
+#message(STATUS "CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR}")
+#message(STATUS "CMAKE_CURRENT_BINARY_DIR = ${CMAKE_CURRENT_BINARY_DIR}")
 
 target_include_directories(${PROJECT_NAME}
   PUBLIC
@@ -163,6 +180,16 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE TBB::${OPENPGL_TBB_COMPONENT})
+if (OPENPGL_EF_IMAGE_SPACE_GUIDING_BUFFER)
+  target_include_directories(${PROJECT_NAME}
+    PRIVATE
+      OpenImageDenoise
+      #ZLIB
+  )
+  target_link_libraries(${PROJECT_NAME} PRIVATE OpenImageDenoise)
+  #target_link_libraries(${PROJECT_NAME} PRIVATE ZLIB::ZLIB)
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME ${OPENPGL_LIBRARY_NAME})
 ## Configure OpenPGL installation ##
 
@@ -179,16 +206,33 @@ install(FILES
   ${PROJECT_SOURCE_DIR}/LICENSE.txt
   ${PROJECT_SOURCE_DIR}/third-party-programs.txt
   ${PROJECT_SOURCE_DIR}/third-party-programs-Embree.txt
-  ${PROJECT_SOURCE_DIR}/third-party-programs-TBB.txt
+  ${PROJECT_SOURCE_DIR}/third-party-programs-oneTBB.txt
+  ${PROJECT_SOURCE_DIR}/third-party-programs-ISPC.txt
+  ${PROJECT_SOURCE_DIR}/third-party-programs-OIDN.txt
   ${PROJECT_SOURCE_DIR}/README.md
   ${PROJECT_SOURCE_DIR}/CHANGELOG.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR}/${PROJECT_NAME})
 
 ## Version header ##
-
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}/version.h
+  @ONLY
+)
+
+## Defines header ##
+
+if(OPENPGL_EF_RADIANCE_CACHES)
+  set(OPENPGL_RADIANCE_CACHES ON)
+endif()
+
+if(OPENPGL_EF_IMAGE_SPACE_GUIDING_BUFFER)
+  set(OPENPGL_IMAGE_SPACE_GUIDING_BUFFER ON)
+endif()
+
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/defines.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}/defines.h
   @ONLY
 )
 
@@ -198,5 +242,9 @@ target_include_directories(${PROJECT_NAME}
 )
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}/version.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}/defines.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 )

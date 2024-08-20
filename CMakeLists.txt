@@ -22,7 +22,7 @@ include(GNUInstallDirs)
 
 ## Establish project ##
 
-project(openpgl VERSION 0.5.0 LANGUAGES C CXX)
+project(openpgl VERSION 0.6.0 LANGUAGES C CXX)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 include(openpgl_macros)
@@ -43,12 +43,19 @@ ENDIF()
 ##############################################################
 # Open PGL specific configuration 
 ##############################################################
-#option(OPENPGL_USE_OMP_THREADING "Use omp instead of tbb for threading." OFF)
+
 option(OPENPGL_BUILD_STATIC "Build OpenPGL as static library." OFF)
 
 option(OPENPGL_BUILD_TOOLS "Build tool applications." OFF)
+option(OPENPGL_BUILD_CHECK_TOOL "Build check tool application." OFF)
 
 try_compile(COMPILER_SUPPORTS_ARM_NEON "${CMAKE_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/cmake/check_arm_neon.cpp")
+
+OPTION(OPENPGL_EF_RADIANCE_CACHES "Enables experimental feature (ir)radiance caches." ON)
+OPTION(OPENPGL_EF_IMAGE_SPACE_GUIDING_BUFFER "Enables experimental feature ImageSpaceGuidignBuffer." ON)
+
+OPTION(OPENPGL_DIRECTION_COMPRESSION "Using 32-Bit compression to represent directions." ON)
+OPTION(OPENPGL_RADIANCE_COMPRESSION "Using RGBE 32-Bit compression to represent radiance data (linear RGB)." ON)
 
 if(COMPILER_SUPPORTS_ARM_NEON)
   option(OPENPGL_ISA_NEON "Build with support for NEON." ON)
@@ -80,12 +87,27 @@ endif()
 
 FIND_PACKAGE(TBB REQUIRED ${OPENPGL_TBB_COMPONENT})
 
+if (OPENPGL_EF_IMAGE_SPACE_GUIDING_BUFFER)
+  FIND_PACKAGE(OpenImageDenoise 2.2.0 REQUIRED)
+  #FIND_PACKAGE(ZLIB REQUIRED)
+endif()
+
+## Global compiler setup
+if(WIN32)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEPENDENTLOADFLAG:0x2000")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /DEPENDENTLOADFLAG:0x2000")
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /Qoption,link,/DEPENDENTLOADFLAG:0x2000")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /Qoption,link,/DEPENDENTLOADFLAG:0x2000")
+  endif()
+endif(WIN32)
+
 ## Build library and  ##
 add_subdirectory(openpgl)
 
-if (OPENPGL_BUILD_TOOLS)
-  add_subdirectory(tools)
-endif()
+add_subdirectory(tools)
+
 ## Configure CMake find_package() config files ##
 
 include(CMakePackageConfigHelpers)
